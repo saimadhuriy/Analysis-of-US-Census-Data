@@ -1,0 +1,739 @@
+---
+title: 'Assignment #5 - AMOD 5250H'
+author: "Sai Madhuri Yerramsetti"
+date: 'release date: 18/12/2019'
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '3'
+  html_notebook:
+    df_print: paged
+    highlight: tango
+    self_contained: yes
+    theme: paper
+    toc: yes
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+```
+**Final Project**
+
+****Data SUmmary and methodology******
+------------------------------------------
+```{r eval=FALSE}
+library(readr)
+library(data.table)
+
+# Save the required column names into a vector
+required_columns <- c("ST", "AGEP", "REGION", "CIT", "SEX", "POBP", "WAOB", "ENG", "OCCP", "SCHL", "PERNP", "ADJINC", "MAR", "FOD2P", "SCIENGP", "SCIENGRLP", "ESR", "PWGTP")
+
+# Select the required columns from 4 datasets and convert them into dataframes
+pusa_file <- fread("psam_pusa.csv", select = required_columns)
+pusb_file <- fread("psam_pusb.csv", select = required_columns)
+pusc_file <- fread("psam_pusc.csv", select = required_columns)
+pusd_file <- fread("psam_pusd.csv", select = required_columns)
+
+# Combine the above 4 dataframes into 1
+population_data <- rbind(pusa_file, pusb_file, pusc_file, pusd_file)
+
+# Convert the population_data dataframe into a csv file
+write.csv(population_data, "PopulationData.csv", row.names=T)
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Data Selected:
+
+Following are the columns that are selected for the analysis:
+1) ST : state variable which contains values of various USA states from which data is collected.
+2) AGEP: Age variable of each person.
+3) REGION - region from which data of the person is collected
+4) CIT - citizenship status of the person in USA
+5) SEX - gender of the person
+6) POBP - Place of birth of the person
+7) WAOB - World area of birth
+8) ENG - English speaking ability of the person
+9) OCCP - occupation of the person'
+10) SCHL - Education level of the person
+11) PERNP - Total earning of the person
+12) ADJINC - Adjustment factor for the total earning to compenSate for the inflation.
+13) MAR - Marital status
+14) FOD2P - Field of degree
+15) SCIENGP - This is a flag indicating if the person has Science and engineering background
+16) SCIENGRLP - This is a flag indicating if the person has Science and engineering related background
+17) ESR - Employment status
+18) PWGTP - Weighting factor
+
+Aim of this project is to analyse various factors effecting or effected by the immigrants in USA. So, relevant variables are selected in order analyse the topic.
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+# Read population data from the saved CSV in the previous steps
+population_data <- read.csv("PopulationData.csv")
+
+# Considering all the columns from population data except for the first one since rownumber was saved as first column # and saved it into modified_population dataframe
+modified_population <- population_data[ , -1]
+
+# Naming of columns in the dataframe into meaningful ones
+colnames(modified_population) <- c("state", "age", "region", "citizenship_status", 
+                              "sex", "place_of_birth", "area_of_birth",
+                              "ability_to_speak_english", "occupation", 
+                              "education_level", "total_person_earnings", 
+                              "adjustment_factor", "marital_status", 
+                              "field_of_degree", "science_eng", 
+                              "science_eng_related", "employment_status", "person_weight")
+
+head(modified_population)
+summary(modified_population)
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+In this step I have taken the dataframe and renamed all the columns into more meaningful column names for easy understanding
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+library(readr)
+library(data.table)
+library(dplyr)
+library(tidyr)
+
+# For the education_level, check the age and if it is < 3, replace the NAs with zero
+# if not leave it as it is
+modified_population <- modified_population %>%
+                        mutate(education_level = ifelse(age < 3, replace_na(education_level, 0), education_level))
+
+# For the occupation, check the age and if it is < 16, replace the NAs with zero
+# if not leave it as it is
+modified_population <- modified_population %>%
+                         mutate(occupation = ifelse(age < 16, replace_na(occupation, as.double(0)), occupation))
+
+# Check the number of NAs in total_person_earnings when age > 15
+modified_population %>% filter(age > 15 & is.na(total_person_earnings)) %>% summarise(count = n())
+
+# Check the number of NAs in total_person_earnings when age > 15
+modified_population %>% filter(age < 15 & is.na(total_person_earnings)) %>% summarise(count = n())
+
+#check that number of NAs when age < 15 (2697977) is almost equal to total number of NAs (2897568)
+modified_population %>% filter(is.na(total_person_earnings)) %>% summarise(count = n())
+
+# Create a new column for adjusted earnings with inflation
+modified_population <- modified_population %>% 
+  mutate(earnings_adjusted = adjustment_factor * (total_person_earnings / 1000000))
+
+# Check for NAs in adjusted earnings
+modified_population %>% filter(is.na(earnings_adjusted)) %>% summarise(count = n())
+
+
+# For the employment_status, check the age and if it is < 16, replace the NAs with zero
+# if not leave it as it is
+modified_population <- modified_population %>%
+                         mutate(employment_status = ifelse(age < 16, replace_na(employment_status, 0),                                               employment_status))
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+Removal fo NAs:
+When summary is observed for modified_population, a noticeable number of NAs are present in each column.
+In order to reduce the NAs, following changes are made to the data:
+
+1) education_level: As per the data dictionary for ACS population data, it is given that education_level for persons who are < 3 in age are considered as "not applicable" for the education. Therfore, analysis is done to check if there are any people with age<3 and NA in the education_level, and replace the corresponding NAs with zero. If it is not <3, keep the values as it is.
+
+2) occupation: As per the data dictionary for ACS population data, it is given that occupation for persons who are < 15 in age are considered as "not applicable" for the occupation. Therfore, analysis is done to check if there are any people with age<15 and NA in the education_level, and replace the corresponding NAs with zero. If it is not <15, keep the values as it is.
+
+3) total_person_earnings: As per the data dictionary for ACS population data, it is given that occupation for persons who are < 15 in age are considered as "not applicable" for the earnings. In order to reduce NAs, first checked for any NAs with age > 15 which returned no rows. Later, checked for NAs with age < 15 which returned count as 2697977 which is almost equal to total number of NAs in the column - 2897568. So, NAs are kept as it is as they are corresponding to the underage persons who are not eligible for earnings
+
+4) earnings_adjusted: Verified if the NAs count in this column is equal to NAs in total_person_earnings as expected
+
+5) employment_status: As per the data dictionary for ACS population data, it is given that employment_status for persons who are < 16 in age are considered as "not applicable" for the employment. Therfore, analysis is done to check if there are any people with age<16 and NA in the employment_status, and replace the corresponding NAs with zero. If it is not <16, keep the values as it is.
+
+All the zeros are factorized as "not applicable" in the next step. The NAs in ability_to_speak_english column are dealt in next step
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+library(dplyr)
+library(tidyr)
+library(forcats)
+library(ggplot2)
+library(caret)
+
+# Convert the "sex" column into factor of 2 levels
+modified_population$sex = fct_recode(factor(modified_population$sex), male="1", female="2")
+
+# Convert the "region" column into factor of 5 levels
+modified_population$region = fct_recode(factor(modified_population$region), northeast="1",midwest="2", south="3", west="4",   puerto_rico="5")
+
+# Convert the "citizenship_status" column into factor of 5 levels
+modified_population$citizenship_status = fct_recode(factor(modified_population$citizenship_status), us_citizen = "1", us_citizen = "2", us_citizen_at_birth = "3", naturalized_immigrant="4", immigrant="5")
+
+# Check for distinct column values
+distinct(modified_population, education_level)
+
+# Convert the "education_level" column into factor of 9 levels
+modified_population$education_level = fct_collapse(factor(modified_population$education_level), 
+                                                 not_applicable = c("bb", "0"),
+                                                 no_schooling = c("01", "1"),
+                                                 preschool = c("02", "2"),
+                                                 no_degree = c("03", "04", "05", "06", "07", "08", "09", "10", "11",                                                                 "12", "13", "14", "15", "16", "17", "18", "19",
+                                                               "3", "4", "5", "6", "7", "8", "9"),
+                                                 asscociates_degree = "20",
+                                                 bachelors_degree = "21",
+                                                 masters_degree = "22",
+                                                 professional_degree = "23",
+                                                 doctorate_degree = "24"
+                                              )
+
+
+# Convert the "marital_status" column into factor of 5 levels
+modified_population$marital_status = fct_recode(factor(modified_population$marital_status), married="1", widowed="2", divorced="3", seperated="4", not_married="5")
+
+# Convert the "science_eng" column into factor of 2 levels
+modified_population$science_eng = fct_recode(factor(modified_population$science_eng), yes="1", no="2", no_applicable = "b")
+
+# Convert the "science_eng_related" column into factor of 2 levels
+modified_population$science_eng_related = fct_recode(factor(modified_population$science_eng_related), yes="1", no="2", not_applicable = "b")
+
+# Convert the "employment_status" column into factor of 4 levels
+modified_population$employment_status = fct_collapse(factor(modified_population$employment_status), 
+                                                 not_applicable = c("b", "0"),
+                                                 employed = c("1", "2", "4", "5"),
+                                                 unemployed = "3",
+                                                 not_in_labor_force = "6"
+                                                 )
+
+# Convert the "area_of_birth" column into factor of 8 levels
+modified_population$area_of_birth = fct_recode(factor(modified_population$area_of_birth), US="1", US="2", Latin_America="3", Asia="4", Europe="5", Africa = "6", North_America = "7", Oceania_and_at_sea = "8")
+
+# Check for distinct column values
+distinct(modified_population, ability_to_speak_english)
+
+# For the ability_to_speak_english, check if area_of_birth is "US" and age < 16,then replace the NAs with zero
+# if not leave it as it is
+modified_population <- modified_population %>%
+                         mutate(ability_to_speak_english = ifelse((area_of_birth ==                                                                  "US" | age < 5),replace_na(ability_to_speak_english, 0), ability_to_speak_english))
+
+# Convert the "ability_to_speak_english" column into factor of 5 levels
+modified_population$ability_to_speak_english = fct_recode(factor(modified_population$ability_to_speak_english), not_applicable="b", not_applicable = "0", not_applicable = "NA", very_well="1", well="2", not_well="3", not_at_all="4")
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+In order factorize the columns in the dataframe, following steps are implemented:
+
+1) sex: This column is converted into a factor with levels - male and female
+2) region: This column is converted into a factor with levels - northeast, midwest, south, west, puerto_rico
+3) citizenship_status : This column is converted into a factor with levels - us_citizen, us_citizen, us_citizen_at_birth, naturalized_immigrant, immigrant
+4) science_eng & science_eng_related: These columns are converted into factors with levels - yes and no
+5) employment_status: This column is converted into a factor with levels - not_applicable, no_scholling, preschool, no_degree, asscociates_degree, bachelors_degree, masters_degree, professional_degree, doctorate_degree
+6) marital_status: This column is converted into a factor with levels - married, widowed, divorced, seperated, not_married
+7) employment_status: This column is converted into a factor with levels - not_applicable, employed, unemployed, not_in_labor_force
+8) area_of_birth : This column is converted into a factor with levels - US, Latin_America, Asia, Europe, Africa, North_America, Oceania_and_at_sea
+9) ability_to_speak_english: This column is converted into a factor with levels - not_applicable, not_applicable, not_applicable, very_well, well, not_well, not_at_all
+
+Removal of NAs in ability_to_speak_english:
+As per the data dictionary for ACS population data, it is given that ability_to_speak_english for persons who are < 5 in age and whose language is only English, are considered as "not applicable". In order to eliminate NAs, assumption is made that US citizens have English as their only language. As per the assumption, analysis is done to check if there are any people who are US born with age<5 and NA in the ability_to_speak_english, and corresponding NAs are replaced with zero. If it is not <5, keep the values as it is.
+If there are any other NAs are remaning after the above step, they are also considered as "not applicable"
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+# made a vector with all the occupation codes of computer science and mathematics related jobs
+csc_occupation_codes = c(110,1005,1006,1007,1010,1020,1030,1050,1060,1105,1106,1107,1200,1220,1240)
+
+# Create a seperate dataframe with immigrants information of computer science and mathematics related jobs
+modified_population_2 <- modified_population %>%
+                           select(occupation, citizenship_status) %>%
+                           filter((occupation %in% csc_occupation_codes) & (citizenship_status ==                                                       "naturalized_immigrant" | citizenship_status == "immigrant"))
+
+# convert the occupation column into factors of 15 levels
+modified_population_2$occupation = fct_recode(factor(modified_population_2$occupation),
+                                                 COMPUTER_IT_MANAGERS = "110",
+                                                 COMPUTER_AND_INFORMATION_RESEARCH_SCIENTISTS = "1005",
+                                                 COMPUTER_SYSTEMS_ANALYSTS = "1006",
+                                                 INFORMATION_SECURITY_ANALYSTS = "1007",
+                                                 COMPUTER_PROGRAMMERS = "1010",
+                                                 SOFTWARE_DEVELOPERS_APPLICATIONS_AND_SYSTEMS_SOFTWARE = "1020",
+                                                 WEB_DEVELOPERS = "1030",
+                                                 COMPUTER_SUPPORT_SPECIALISTS = "1050",
+                                                 DATABASE_ADMINISTRATORS = "1060",
+                                                 NETWORK_AND_COMPUTER_SYSTEMS_ADMINISTRATORS = "1105",
+                                                 COMPUTER_NETWORK_ARCHITECTS = "1106",
+                                                 COMPUTER_OCCUPATIONS_ALL_OTHER = "1107",
+                                                 ACTUARIES = "1200",
+                                                 OPERATIONS_RESEARCH_ANALYSTS = "1220",
+                                                 MISCELLANEOUS_MATHEMATICAL_SCIENCE_OCCUPATIONS = "1240"
+                                              )
+
+# check the summary
+summary(modified_population)
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+In order to analyse the immigrant counts with respect to computer science and mathematics related jobs, seperate dataframe is created with only immigrant information of the people who hold those jobs
+
+In summary, it can be observed most of the NAs are eliminated and all the categorical variables are factorised
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+library(forcats)
+library(ggplot2)
+
+# Generate a pie-chart to check the proportion of immigrants in USA
+modified_population %>% 
+  group_by(citizenship_status) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x="", y=count, fill=citizenship_status))+
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start=0) + # to generate pie-chart
+  ylab("Count") + # Changes y-axis label
+  ggtitle("Proportion of immigrants") + # Changes plot title
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) #To display the axis points in normal notation instead of scientfic notation, to easily understand
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+To evaluate the proportion of the immigrants in total US population graphically, pie chart is generated. It can be observed that only about 20% of the population is constituted of immigrants.
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+
+# generate bar plot for female and male immigrant counts considering the whole population
+modified_population %>% 
+  select(citizenship_status, sex) %>%
+  ggplot(na.rm = TRUE) + 
+  geom_bar(mapping = aes(x = sex, fill = citizenship_status), position = "dodge") +
+  ylab("Count") + # Changes y-axis label
+  xlab("Gender") + # Changes x-axis label
+  ggtitle("Count of male and female citizens and immigrants") + # Changes plot title
+  theme_bw() + # changes the background color
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) # changes the notation of points on axis
+
+# generate bar plot for female and male immigrant counts considering the only immigrant population
+modified_population %>% 
+  select(citizenship_status, sex) %>%
+  filter(citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant") %>%
+  ggplot(na.rm = TRUE) + 
+  geom_bar(mapping = aes(x = sex, fill = citizenship_status), position = "dodge") +
+  ylab("Count") + # Changes y-axis label
+  xlab("Gender") + # Changes x-axis label
+  ggtitle("Count of male and female immigrants") + # Changes plot title
+  theme_bw() + # changes the background color
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) # changes the notation of points on axis
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+It can be observed that immigrant count is almost similar for both male and females. Whereas, more female naturalized immigrants are present their male counterparts
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+# generate line plot for immigrant counts for all age groups, considering the whole population
+modified_population %>%
+  select(citizenship_status, age) %>%
+  group_by(age, citizenship_status) %>%
+  summarise(citizen_immigrant_count = n()) %>%  # get immigrant count for a particular age
+  ggplot(aes(x = age, y = citizen_immigrant_count)) +
+  geom_line(aes(color = citizenship_status)) +
+  ylab("Count of population") + # Changes y-axis label
+  xlab("Age") + # Changes x-axis label
+  ggtitle("Citizen and Immigrant count vs age") + # Changes plot title
+  theme_bw() +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) # changes the notation of points on axis
+
+# generate line plot for immigrant counts for all age groups considering only immigrant population
+modified_population %>%
+  select(citizenship_status, age) %>%
+  filter(citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant") %>%
+  group_by(age, citizenship_status) %>%
+  summarise(immigrant_count = n()) %>% # get immigrant count for a particular age
+  ggplot(aes(x = age, y = immigrant_count)) +
+  geom_line(aes(color = citizenship_status)) +
+  ylab("Count of immigrants") + # Changes y-axis label
+  xlab("Age") + # Changes x-axis label
+  ggtitle("Immigrant count vs age") + # Changes plot title
+  theme_bw() +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) # changes the notation of points on axis
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+It can be observed that when total population is considered, us citizen count is considerably large that all other categories in all age groups. Whereas, when only immigrant population is considered immigrant counts is more for ages 28 to 38 approximately and naturalized immigrant count is more for ages 50-60.
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+
+# generate bar plot for immigrant counts with considering the whole population for different regions of birth
+modified_population %>% 
+  select(citizenship_status, area_of_birth) %>%
+  filter(citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant") %>%
+  ggplot(na.rm = TRUE) + 
+  geom_bar(mapping = aes(x = area_of_birth, fill = citizenship_status), position = "dodge") +
+  ylab("Count") + # Changes y-axis label
+  xlab("Region of Birth") + # Changes x-axis label
+  ggtitle("Count of immigrants coming from various regions of the world") + # Changes plot title
+  theme_bw() + # change background color of plot
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1.0)) + #Changes x-axis points angle by 90 degree
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) #change scientific notation of axis points
+
+# Get the count of immigrants from Latin America and order them in descending order to get the top mst countries
+modified_population %>%
+  select(citizenship_status, area_of_birth, place_of_birth) %>%
+  filter(citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant") %>%
+   filter(area_of_birth == "Latin_America") %>%
+   group_by(place_of_birth) %>%
+   summarize(count = n()) %>%
+   arrange(desc(count)) %>%
+   top_n(2)
+
+# Get the count of immigrants from Asia and order them in descending order to get the top mst countries
+modified_population %>%
+  select(citizenship_status, area_of_birth, place_of_birth) %>%
+  filter(citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant") %>%
+   filter(area_of_birth == "Asia") %>%
+   group_by(place_of_birth) %>%
+   summarize(count = n()) %>%
+   arrange(desc(count)) %>%
+   top_n(4)
+
+
+
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+From the plot it can be observed that more immigrants are coming from latin America and Asia. When top countries with high count of immigrants is checked, following countries are obtained (ordered in descending order of the immigrant count):
+Latin America:
+Mexico - 303(country code)
+Cuba - 327
+
+Asia:
+India - 210
+China - 207
+philippines - 233
+vietnam - 247
+Korea- 217
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+#Generate bar graph to analyse the count of immigrants in various regions of USA, with total population considered
+modified_population %>% 
+  select(citizenship_status, region) %>%
+  ggplot(na.rm = TRUE) + 
+  geom_bar(mapping = aes(x = region, fill = citizenship_status), position = "dodge") +
+  ylab("Count") + # Changes y-axis label
+  xlab("US Region") + # Changes x-axis label
+  ggtitle("Count of immigrants in different regions of US") + # Changes plot title
+  theme_bw() +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+
+#Generate bar graph to analyse the count of immigrants in various regions of USA, with only immigrant population #considered
+modified_population %>% 
+  select(citizenship_status, region) %>%
+  filter(citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant") %>%
+  ggplot(na.rm = TRUE) + 
+  geom_bar(mapping = aes(x = region, fill = citizenship_status), position = "dodge") +
+  ylab("Count") + # Changes y-axis label
+  xlab("US Region") + # Changes x-axis label
+  ggtitle("Count of citizens and immigrants in different regions of US") + # Changes plot title
+  theme_bw() +
+  scale_fill_manual(values=c("purple", "red")) + # change the color of bar plot
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+
+#West, South
+#South - citizens
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Main observations from the plots are:
+
+According to first plot, US citizen count is more in south and midwest regions.
+According to second plot, immigrant count is more in south and west regions
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+
+# Generate bar graph to analyse the count of immigrants with various English fluencies, with only immigrant #population considered
+
+modified_population %>% 
+  select(citizenship_status, ability_to_speak_english) %>%
+  filter(!is.na(ability_to_speak_english) & (citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant")) %>%
+  ggplot(na.rm = TRUE) + 
+  geom_bar(mapping = aes(x = ability_to_speak_english, fill = citizenship_status), position = "dodge") +
+  ylab("Immigrant Count") + # Changes y-axis label
+  xlab("English Fluency") + # Changes x-axis label
+  ggtitle("Immigrants count by English influency") + # Changes plot title
+  theme_bw() +
+  scale_fill_manual(values=c("blue", "green")) + # changes bar plot colors
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Main observations from the plot is:
+Most of the immigrants coming from other countries have very well English flunecy
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+
+#Generate dot plot to analyse the mean earnings of immigrants and citizens of different ages
+
+modified_population %>%
+  select(citizenship_status, earnings_adjusted, age) %>%
+  filter(!is.na(earnings_adjusted)) %>% # filter NAs
+  group_by(age, citizenship_status) %>%
+  summarise(mean_earnings = mean(earnings_adjusted, na.rm=TRUE)) %>% # calculate mean earnings
+  ggplot() + 
+  geom_point(mapping = aes(x = age, y = mean_earnings, color = citizenship_status)) +
+  ylab("Mean Earnings") + # Changes y-axis label
+  xlab("Age") + # Changes x-axis label
+  ggtitle("Immigrants mean earnings by age") + # Changes plot title
+  theme_bw() + #Change the background color
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+ 
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+As per the graph, US citizens have greater earnings than the immigrants and naturalized immigrants for working age groups
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+
+#Generate a pie chart for analysing the count of immigrants with various computer science jobs
+
+modified_population_2 %>%
+  group_by(occupation) %>%
+  summarise(occp_immi_count = n()) %>%
+  ggplot(aes(x="", y = occp_immi_count, fill = occupation)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start=0) +
+  ylab("Count") +
+  ggtitle("Proportion of immigrants with various computer science jobs") + # Changes plot title
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+
+#software developers,applications and systems software, computer programmers
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+It can observed that, immigrants with following jobs are in greater proportion:
+1) Software developers, application and systems software engineers
+2) Computer programmers
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+
+# Tabular summaries of various categorical variables analysed in the graphs
+
+table(modified_population[c("citizenship_status", "sex")])
+table(modified_population[c("citizenship_status", "region")])
+table(modified_population[c("citizenship_status", "area_of_birth")])
+table(modified_population[c("citizenship_status", "ability_to_speak_english")])
+table(modified_population_2[c("citizenship_status", "occupation")]) 
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+All the above tabular gives an estimate of counts that graphs represented.
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r eval=FALSE}
+
+#********************************* UNUSED CODE **************************************************************
+
+# T Test for independent samples
+data1 <- modified_population %>% 
+    filter(citizenship_status == "immigrant") %>%
+    select(earnings_adjusted) 
+
+data2 <- modified_population %>% 
+    filter(citizenship_status == "naturalized_immigrant") %>%
+    select(earnings_adjusted)
+
+var(data1$earnings_adjusted, na.rm = TRUE)
+var(data2$earnings_adjusted, na.rm = TRUE)
+
+qqnorm(data1$earnings_adjusted)
+qqnorm(data1$earnings_adjusted)
+
+#Chisquared test
+library(vcd) 
+
+chisq.test(table(modified_population[c("citizenship_status", "sex")]), correct = FALSE)
+chisq.test(table(modified_population[c("citizenship_status", "region")]), correct = FALSE)
+chisq.test(table(modified_population[c("citizenship_status", "area_of_birth")]), correct = FALSE)
+chisq.test(table(modified_population[c("citizenship_status", "ability_to_speak_english")]), correct = FALSE)
+
+assocstats(table(modified_population[c("citizenship_status", "sex")]))
+
+# Linear regression model
+regression_data <- modified_population %>% 
+  filter(citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant") %>%
+  select(citizenship_status, age, earnings_adjusted)
+
+par(mfrow=c(2,2))
+plot(relation_1)
+plot(relation_2)
+
+relation_1 <- lm(formula = earnings_adjusted ~ citizenship_status, data = regression_data)
+relation_2 <- lm(formula = age ~ citizenship_status, data = regression_data)
+summary(relation_1)
+summary(relation_2)
+
+# Binomial logistic regression:
+regression_data <-modified_population %>% 
+  select(citizenship_status, age, earnings_adjusted, sex, region, area_of_birth, ability_to_speak_english) %>%
+  mutate(is_immigrant = ifelse(citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant", 1, 0))
+
+#head(regression_data)
+regression_data$is_immigrant = fct_recode(factor(regression_data$is_immigrant), yes="1", no="0")
+
+binom.model = glm(formula = is_immigrant ~ age+earnings_adjusted, 
+                  data = regression_data, family = binomial(link='logit'))
+
+summary(binom.model)
+
+# Multinomial regression
+regression_data <-modified_population %>% 
+  select(citizenship_status, age, earnings_adjusted, sex, region, area_of_birth, ability_to_speak_english) %>%
+  mutate(id=row_number())
+
+train_data <- regression_data %>% sample_frac(.70)
+test_data <-anti_join(regression_data, train_data, by='id')
+
+require(nnet)
+multinom_fit <- nnet::multinom(citizenship_status ~.-id, maxit=500, data = train_data)
+summary(multinom_fit)
+
+exp(coef(multinom_fit))
+varImp(multinom_fit)
+p1<-predict(multinom_fit, type="class", newdata=test_data)
+p2<-predict(multinom_fit, type="probs", newdata=test_data)
+postResample(test_data$citizenship_status, p1)
+
+#Mulitnomial regresiion with two level factorised citizenship:
+
+regression_data <-modified_population %>% 
+  filter(citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant") %>%
+  select(citizenship_status, age, earnings_adjusted, sex, region, area_of_birth, ability_to_speak_english) %>%
+  mutate(immigrant_type = ifelse(citizenship_status == "naturalized_immigrant", 1, 0)) %>%
+  mutate(id=row_number())
+
+# Factorise the new column to create a new factor of two levels instead of four levels of original citizenship_stsatus column, in order to decrease the data being analysed and to specifically analyse only for immigrants
+regression_data$immigrant_type = fct_recode(factor(regression_data$immigrant_type), naturalised_immigrant="1", immigrant="0")
+
+head(regression_data)
+
+
+#divide the data into two parts - train and test data
+train_data <- regression_data %>% sample_frac(.70)
+test_data <-anti_join(regression_data, train_data, by='id')
+
+#Check the proportion of immigrant and naturalized immigrant propotion in divided data
+prop.table(table(regression_data$immigrant_type))
+prop.table(table(regression_data$immigrant_type))
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Missing values:
+- Missing values in all the columns are appropriately checked if they are missing values or "Not applicable" values. Whenever it is found that missing values are actually not applicable values, they are substituted accordingly.
+- In few cases, input in the columns is given in wrong format as in case of education_level. In this column, the values are updated as "1", "2", "3" instead "01", "02", "03". Such values are evaluated properly and factorised in appropriate levels. 
+- Missing values in earnings column are not removed as they are actually "not applicable" data and changing them might effect the analysis greatly.
+
+Adjustment of the values:
+The total earnings variable is adjusted for inflation and saved in a new column "earnings_adjusted"
+
+Relations that are analysed, but not included in findings section:
+1) In order to analyse the means between earnings of immigrants and naturalized immigrants,planned to do t - test, but when variance is checked, they was a large difference in the variances. Also, the qqplot showed that distribution is not normal.
+2) Though Chi squared test is performed on all categorical variable relation with citicenship variable, the p-value seemed to be similar for all the tests. Inspite of analysing why it happened, a conclusion wasn't drawn from it.
+3) Linear regression was planned to be performed to analyse the relation between total earnings and citizenship status. But the plot of linear model produced results which are not in accordance with assumptions of linear regression.
+4) Converted the citizenship categorical variable into a binomial variable and tried to perform binomial logistic regression. This took ample amount of time with multiple rstudio crashes and produced unconverged results
+5) Multinomial regression considering all of the citizenship column as response variable values and other variables as predictor variables also caused system crash and produced no results.
+6) New data frame is created to multinomial regression with only required columns of immigrant population and then the new column is factorised to create a new factor of two levels instead of four levels of original citizenship_stsatus column, in order to decrease the data being analysed and to specifically analyse only for immigrants. 
+The proportions are checked to make sure the immigrant counts are evenly distributed to avoid bias. But this generated very insignificant coefficients.
+
+In order avoid the above situations, multinomial regression with filtered was preferred in following sections.
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+#********************************* Findings ***************************************************
+
+# chi-squared tests for various categorical variable combinations
+chisq.test(table(modified_population[c("citizenship_status", "sex")]), correct = FALSE)
+chisq.test(table(modified_population[c("citizenship_status", "region")]), correct = FALSE)
+chisq.test(table(modified_population[c("citizenship_status", "area_of_birth")]), correct = FALSE)
+chisq.test(table(modified_population[c("citizenship_status", "ability_to_speak_english")]), correct = FALSE)
+
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+As mentioned in the above section, chi-squared test produced a very low p-value for all the tests with following variable combinations:
+1) citizenship status with sex
+2) citizenship status with region
+3) citizenship status with area_of_birth
+4) citizenship status with ability_to _speak_english
+
+Low p-values proves that all the above relations are significant since null hypothesis(no relationship between variables) can be rejected
+
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+
+# Created a new dataframe for multinomial regression with only required columns of immigrant population
+regression_data <-modified_population %>% 
+  filter(citizenship_status == "naturalized_immigrant" | citizenship_status == "immigrant") %>%
+  select(citizenship_status, age, earnings_adjusted, sex, region, area_of_birth, ability_to_speak_english) %>%
+  mutate(id=row_number())
+
+#Using sample_frac to create 70 - 30 split into test and train
+train_data <- regression_data %>% sample_frac(.70)
+test_data <-anti_join(regression_data, train_data, by='id')
+
+#Check the proportion of immigrant and naturalized immigrant propotion in divided data
+prop.table(table(regression_data$citizenship_status))
+prop.table(table(regression_data$citizenship_status))
+
+#Training the multinomial model
+require(nnet)
+multinom_fit <- nnet::multinom(citizenship_status ~.-id, maxit=500, data = train_data)
+
+#checking the model
+summary(multinom_fit)
+
+
+
+
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```{r}
+# extract the coefficients from the model and exponentiate
+exp(coef(multinom_fit))
+
+# The importance of different predictors
+varImp(multinom_fit)
+
+p1<-predict(multinom_fit, type="class", newdata=test_data)
+p2<-predict(multinom_fit, type="probs", newdata=test_data)
+
+#test accuracy using the caret library
+postResample(test_data$citizenship_status, p1)
+
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+As per the results, since there are no significant coefficient values, we can not predict immigrant infromation from any of the variables taken, strongly, as the they define the variance in response variables with a very less value. Accuracy of the model 0.71 proves that model is 70% accurate.
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+
+
+  
+  
+  
+
+  
+```
+
