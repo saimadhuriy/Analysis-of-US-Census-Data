@@ -22,7 +22,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 **Final Project**
 
-****Data SUmmary and methodology******
+****Data Summary and methodology******
 ------------------------------------------
 ```{r eval=FALSE}
 library(readr)
